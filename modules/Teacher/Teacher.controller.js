@@ -101,7 +101,7 @@ export const signupTeacher = async (req, res) => {
     }
 
     // Create complete profile link
-    const completeProfileLink = `https://alephyaa.net/SchoolsBookClubs/CompleteProfileTeacher?token=${token}`;
+    const completeProfileLink = `https://schoolreadingclubs-front-clcv.vercel.app/CompleteProfileTeacher?token=${token}`;
 
     // Send email
     const mailOptions = {
@@ -362,11 +362,9 @@ export const forgetPasswordTeacher = async (req, res) => {
 
     // Check if passwords match
     if (newPassword !== confirmPassword) {
-      return res
-        .status(400)
-        .json({
-          message: "كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقين",
-        });
+      return res.status(400).json({
+        message: "كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقين",
+      });
     }
 
     // Find teacher by email
@@ -600,12 +598,10 @@ export const generateVerificationCode = async (req, res) => {
 
     res.status(200).json({ message: "تم إرسال رمز التحقق بنجاح" });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "حدث خطأ أثناء إرسال رمز التحقق",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "حدث خطأ أثناء إرسال رمز التحقق",
+      error: error.message,
+    });
   }
 };
 
@@ -635,11 +631,9 @@ export const verifyCodeAndResetPassword = async (req, res) => {
 
     res.status(200).json({ message: "تم تغيير كلمة المرور بنجاح" });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        message: "حدث خطأ أثناء تغيير كلمة المرور",
-        error: error.message,
-      });
+    res.status(500).json({
+      message: "حدث خطأ أثناء تغيير كلمة المرور",
+      error: error.message,
+    });
   }
 };

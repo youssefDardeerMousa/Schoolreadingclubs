@@ -94,7 +94,7 @@ export const signupSupervisor = async (req, res) => {
     await supervisorToken.save();
 
     // Create complete profile link
-    const completeProfileLink = `https://alephyaa.net/SchoolsBookClubs/CompleteProfileSupervisor?token=${token}`;
+    const completeProfileLink = `https://schoolreadingclubs-front-clcv.vercel.app/CompleteProfileSupervisor?token=${token}`;
 
     // Send email
     const mailOptions = {
