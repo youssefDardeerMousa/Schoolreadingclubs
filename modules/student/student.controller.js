@@ -448,7 +448,7 @@ export const generateVerificationCode = async (req, res) => {
       secure: true,
       auth: {
         user: process.env.EMAIL,
-        pass: process.env.EMAIL_PASSWORD,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
