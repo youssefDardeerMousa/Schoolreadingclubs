@@ -1,102 +1,107 @@
-import Supervisormodel from '../../models/Supervisor.model.js';
-import SupervisorTokenModel from '../../models/SupervisorToken.model.js';
-import Schoolmodel from '../../models/School.model.js';
-import jwt from 'jsonwebtoken';
-import nodemailer from 'nodemailer';
-import Joi from 'joi';
-import bcrypt from 'bcryptjs';
-import dotenv from 'dotenv';
+import Supervisormodel from "../../models/Supervisor.model.js";
+import SupervisorTokenModel from "../../models/SupervisorToken.model.js";
+import Schoolmodel from "../../models/School.model.js";
+import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
+import Joi from "joi";
+import bcrypt from "bcryptjs";
+import dotenv from "dotenv";
 dotenv.config();
 
 // Create transporter for sending emails
 const transporter = nodemailer.createTransport({
-    host: 'mail.alephyaa.net',
-    port: 465,
-    secure: true,
-    auth: {
-        user: process.env.EMAIL,
-        pass: process.env.EMAIL_PASSWORD
-    }
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true,
+  auth: {
+    user: process.env.EMAIL,
+    pass: process.env.EMAIL_PASS,
+  },
 });
 
 // Validation schemas
 const signupSchema = Joi.object({
-    name: Joi.string().required(),
-    email: Joi.string().email().required(),
-    schoolCode: Joi.string().required(),
-    role: Joi.string().default('مشرف')
+  name: Joi.string().required(),
+  email: Joi.string().email().required(),
+  schoolCode: Joi.string().required(),
+  role: Joi.string().default("مشرف"),
 });
 
 const completeProfileSchema = Joi.object({
-    email: Joi.string().email().required(),
-    password: Joi.string().min(6).required(),
-    phone: Joi.string().required()
+  email: Joi.string().email().required(),
+  password: Joi.string().min(6).required(),
+  phone: Joi.string().required(),
 });
 
 const loginSchema = Joi.object({
-    email: Joi.string().email().required(),
-    password: Joi.string().required()
+  email: Joi.string().email().required(),
+  password: Joi.string().required(),
 });
 
 const forgetPasswordSchema = Joi.object({
-    email: Joi.string().email().required(),
-    newPassword: Joi.string().min(6).required(),
-    confirmPassword: Joi.string().valid(Joi.ref('newPassword')).required()
+  email: Joi.string().email().required(),
+  newPassword: Joi.string().min(6).required(),
+  confirmPassword: Joi.string().valid(Joi.ref("newPassword")).required(),
 });
 
 export const signupSupervisor = async (req, res) => {
-    try {
-        // Validate request body
-        const { error } = signupSchema.validate(req.body);
-        if (error) return res.status(400).json({ message: error.details[0].message });
+  try {
+    // Validate request body
+    const { error } = signupSchema.validate(req.body);
+    if (error)
+      return res.status(400).json({ message: error.details[0].message });
 
-        const { name, email, schoolCode, role } = req.body;
+    const { name, email, schoolCode, role } = req.body;
 
-        // Check if supervisor already exists
-        const existingSupervisor = await Supervisormodel.findOne({ email });
-        if (existingSupervisor) {
-            return res.status(400).json({ message: 'هذا المشرف مسجل بالفعل علي نظامنا' });
-        }
+    // Check if supervisor already exists
+    const existingSupervisor = await Supervisormodel.findOne({ email });
+    if (existingSupervisor) {
+      return res
+        .status(400)
+        .json({ message: "هذا المشرف مسجل بالفعل علي نظامنا" });
+    }
 
-        // Find the school by schoolCode
-        const school = await Schoolmodel.findOne({ code:schoolCode });
-        if (!school) {
-            return res.status(404).json({ message: 'لم يتم العثور على المدرسة بهذا الكود' });
-        }
+    // Find the school by schoolCode
+    const school = await Schoolmodel.findOne({ code: schoolCode });
+    if (!school) {
+      return res
+        .status(404)
+        .json({ message: "لم يتم العثور على المدرسة بهذا الكود" });
+    }
 
-        // Create new supervisor with schoolId
-        const supervisor = new Supervisormodel({
-            name,
-            email,
-            schoolCode,
-            role,
-            schoolId: school._id
-        });
-        await supervisor.save();
+    // Create new supervisor with schoolId
+    const supervisor = new Supervisormodel({
+      name,
+      email,
+      schoolCode,
+      role,
+      schoolId: school._id,
+    });
+    await supervisor.save();
 
-        // Generate token
-        const token = jwt.sign(
-            { id: supervisor._id, email, schoolCode, role },
-            process.env.JWT_SECRET
-        );
+    // Generate token
+    const token = jwt.sign(
+      { id: supervisor._id, email, schoolCode, role },
+      process.env.JWT_SECRET,
+    );
 
-        // Save token to database
-        const supervisorToken = new SupervisorTokenModel({
-            SupervisorId: supervisor._id,
-            token,
-            schoolCode : supervisor.schoolCode
-        });
-        await supervisorToken.save();
+    // Save token to database
+    const supervisorToken = new SupervisorTokenModel({
+      SupervisorId: supervisor._id,
+      token,
+      schoolCode: supervisor.schoolCode,
+    });
+    await supervisorToken.save();
 
-        // Create complete profile link
-        const completeProfileLink = `https://alephyaa.net/SchoolsBookClubs/CompleteProfileSupervisor?token=${token}`;
+    // Create complete profile link
+    const completeProfileLink = `https://alephyaa.net/SchoolsBookClubs/CompleteProfileSupervisor?token=${token}`;
 
-        // Send email
-        const mailOptions = {
-            from: process.env.EMAIL,
-            to: email,
-            subject: 'تهانينا! تم إضافتك كمشرف - برنامج اندية القراءة المدرسية',
-            html: `
+    // Send email
+    const mailOptions = {
+      from: process.env.EMAIL,
+      to: email,
+      subject: "تهانينا! تم إضافتك كمشرف - برنامج اندية القراءة المدرسية",
+      html: `
                 <!DOCTYPE html>
                 <html dir="rtl">
                 <head>
@@ -230,218 +235,243 @@ export const signupSupervisor = async (req, res) => {
                     </div>
                 </body>
                 </html>
-            `
-        };
-        
-        
+            `,
+    };
 
-        await transporter.sendMail(mailOptions);
+    await transporter.sendMail(mailOptions);
 
-        res.status(201).json({
-            message: 'تم اضافة المشرف بنجاح في نظامنا وتم ارسال رابط استكمال البيانات على بريده الالكتروني',
-            token
-        });
-
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    res.status(201).json({
+      message:
+        "تم اضافة المشرف بنجاح في نظامنا وتم ارسال رابط استكمال البيانات على بريده الالكتروني",
+      token,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const completeProfileSupervisor = async (req, res) => {
-    try {
-        // Validate request body
-        const { error } = completeProfileSchema.validate(req.body);
-        if (error) return res.status(400).json({ message: error.details[0].message });
+  try {
+    // Validate request body
+    const { error } = completeProfileSchema.validate(req.body);
+    if (error)
+      return res.status(400).json({ message: error.details[0].message });
 
-        const { email, password, phone } = req.body;
+    const { email, password, phone } = req.body;
 
-        // Find supervisor
-        const supervisor = await Supervisormodel.findOne({ email });
-        if (!supervisor) {
-            return res.status(404).json({ message: 'خطأ في البريد الالكتروني' });
-        }
-
-        // Update supervisor
-        supervisor.password = password;
-        supervisor.phone = phone;
-        await supervisor.save();
-
-        res.json({status: 200,success: true, message: 'تم استكمال بيانات المشرف بنجاح' });
-
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    // Find supervisor
+    const supervisor = await Supervisormodel.findOne({ email });
+    if (!supervisor) {
+      return res.status(404).json({ message: "خطأ في البريد الالكتروني" });
     }
+
+    // Update supervisor
+    supervisor.password = password;
+    supervisor.phone = phone;
+    await supervisor.save();
+
+    res.json({
+      status: 200,
+      success: true,
+      message: "تم استكمال بيانات المشرف بنجاح",
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const loginSupervisor = async (req, res) => {
-    try {
-        // Validate request body
-        const { error } = loginSchema.validate(req.body);
-        if (error) return res.status(400).json({ message: error.details[0].message });
+  try {
+    // Validate request body
+    const { error } = loginSchema.validate(req.body);
+    if (error)
+      return res.status(400).json({ message: error.details[0].message });
 
-        const { email, password } = req.body;
+    const { email, password } = req.body;
 
-        // Find supervisor
-        const supervisor = await Supervisormodel.findOne({ email });
-        if (!supervisor) {
-            return res.status(404).json({ message: 'بريد الكتروني غير صالح' });
-        }
-
-        // Check password
-        const isValidPassword = await bcrypt.compare(password, supervisor.password);
-        if (!isValidPassword) {
-            return res.status(400).json({ message: 'كلمة المرور غير صحيحة' });
-        }
-
-        // Get token from database
-        const tokenDoc = await SupervisorTokenModel.findOne({ SupervisorId: supervisor._id });
-        if (!tokenDoc) {
-            return res.status(404).json({ message: 'رمز التحقق غير صالح' });
-        }
-
-        res.json({
-            status: 200,
-            message: 'تم تسجيل الدخول بنجاح',
-            token: tokenDoc.token
-        });
-
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    // Find supervisor
+    const supervisor = await Supervisormodel.findOne({ email });
+    if (!supervisor) {
+      return res.status(404).json({ message: "بريد الكتروني غير صالح" });
     }
+
+    // Check password
+    const isValidPassword = await bcrypt.compare(password, supervisor.password);
+    if (!isValidPassword) {
+      return res.status(400).json({ message: "كلمة المرور غير صحيحة" });
+    }
+
+    // Get token from database
+    const tokenDoc = await SupervisorTokenModel.findOne({
+      SupervisorId: supervisor._id,
+    });
+    if (!tokenDoc) {
+      return res.status(404).json({ message: "رمز التحقق غير صالح" });
+    }
+
+    res.json({
+      status: 200,
+      message: "تم تسجيل الدخول بنجاح",
+      token: tokenDoc.token,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const forgetPasswordSupervisor = async (req, res) => {
-    try {
-        // Validate request body
-        const { error } = forgetPasswordSchema.validate(req.body);
-        if (error) return res.status(400).json({ message: error.details[0].message });
+  try {
+    // Validate request body
+    const { error } = forgetPasswordSchema.validate(req.body);
+    if (error)
+      return res.status(400).json({ message: error.details[0].message });
 
-        const { email, newPassword, confirmPassword } = req.body;
+    const { email, newPassword, confirmPassword } = req.body;
 
-        // Check if passwords match
-        if (newPassword !== confirmPassword) {
-            return res.status(400).json({ message: 'كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقين' });
-        }
-
-        // Find supervisor by email
-        const supervisor = await Supervisormodel.findOne({ email });
-        if (!supervisor) {
-            return res.status(404).json({ message: 'البريد الالكتروني غير مسجل' });
-        }
-
-        // Hash new password
-        const hashedPassword = await bcrypt.hash(newPassword, parseInt(process.env.saltround));
-        
-        // Update password
-        supervisor.password = hashedPassword;
-        await supervisor.save();
-
-       
-
-        res.json({ message: 'تم تغيير كلمة المرور بنجاح' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    // Check if passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        message: "كلمة المرور الجديدة وتأكيد كلمة المرور غير متطابقين",
+      });
     }
+
+    // Find supervisor by email
+    const supervisor = await Supervisormodel.findOne({ email });
+    if (!supervisor) {
+      return res.status(404).json({ message: "البريد الالكتروني غير مسجل" });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      parseInt(process.env.saltround),
+    );
+
+    // Update password
+    supervisor.password = hashedPassword;
+    await supervisor.save();
+
+    res.json({ message: "تم تغيير كلمة المرور بنجاح" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const updateSupervisor = async (req, res) => {
-    try {
-        const { id } = req.params;
-        const update = req.body;
+  try {
+    const { id } = req.params;
+    const update = req.body;
 
-        const supervisor = await Supervisormodel.findByIdAndUpdate(id, update, { new: true });
-        if (!supervisor) {
-            return res.status(404).json({ message: 'هذا المشرف غير موجود' });
-        }
-
-        res.json({status: 200,success: true, message: 'تم تحديث بيانات المشرف بنجاح' });
-
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    const supervisor = await Supervisormodel.findByIdAndUpdate(id, update, {
+      new: true,
+    });
+    if (!supervisor) {
+      return res.status(404).json({ message: "هذا المشرف غير موجود" });
     }
+
+    res.json({
+      status: 200,
+      success: true,
+      message: "تم تحديث بيانات المشرف بنجاح",
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const deleteSupervisor = async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-        const supervisor = await Supervisormodel.findByIdAndDelete(id);
-        if (!supervisor) {
-            return res.status(404).json({ message: 'المشرف غير موجود' });
-        }
-
-        // Delete associated token
-        await SupervisorTokenModel.deleteOne({ SupervisorId: id });
-
-        res.json({status: 200,success: true, message: 'تم حذف المشرف بنجاح' });
-
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    const supervisor = await Supervisormodel.findByIdAndDelete(id);
+    if (!supervisor) {
+      return res.status(404).json({ message: "المشرف غير موجود" });
     }
+
+    // Delete associated token
+    await SupervisorTokenModel.deleteOne({ SupervisorId: id });
+
+    res.json({ status: 200, success: true, message: "تم حذف المشرف بنجاح" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
 };
 
 export const getAllSupervisors = async (req, res) => {
-    try {
-        const supervisors = await Supervisormodel.find().populate('schoolId', 'name code');
-        res.json({status: 200,success: true, data: supervisors});
-    } catch (error) {
-        res.status(500).json({status: 500,success: false, message: error.message });
-    }
+  try {
+    const supervisors = await Supervisormodel.find().populate(
+      "schoolId",
+      "name code",
+    );
+    res.json({ status: 200, success: true, data: supervisors });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ status: 500, success: false, message: error.message });
+  }
 };
 
 export const getSupervisor = async (req, res) => {
-    try {
-        const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-        const supervisor = await Supervisormodel.findById(id).populate('schoolId', 'name code');
-        if (!supervisor) {
-            return res.status(404).json({status: 404,success: false, message: 'المشرف غير موجود' });
-        }
-
-        res.json({status: 200,success: true, data: supervisor});
-
-    } catch (error) {
-        res.status(500).json({status: 500,success: false, message: error.message });
+    const supervisor = await Supervisormodel.findById(id).populate(
+      "schoolId",
+      "name code",
+    );
+    if (!supervisor) {
+      return res
+        .status(404)
+        .json({ status: 404, success: false, message: "المشرف غير موجود" });
     }
+
+    res.json({ status: 200, success: true, data: supervisor });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ status: 500, success: false, message: error.message });
+  }
 };
 
 export const generateVerificationCode = async (req, res) => {
-    try {
-        const { email } = req.body;
-        
-        // Find the teacher
-        const supervisor = await Supervisormodel.findOne({ email });
-        if (!supervisor) {
-            return res.status(404).json({ message: "المشرف غير موجود" });
-        }
+  try {
+    const { email } = req.body;
 
-        // Check if verification code already exists
-        if (supervisor.verifiedCode) {
-            return res.status(400).json({ 
-                message: "لديك بالفعل رمز تحقق صالح. يرجى استخدام الرمز المرسل مسبقاً " 
-            });
-        }
+    // Find the teacher
+    const supervisor = await Supervisormodel.findOne({ email });
+    if (!supervisor) {
+      return res.status(404).json({ message: "المشرف غير موجود" });
+    }
 
-        // Generate a random 6-digit code
-        const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        // Save the code to database
-        supervisor.verifiedCode = verificationCode;
-        await supervisor.save();
+    // Check if verification code already exists
+    if (supervisor.verifiedCode) {
+      return res.status(400).json({
+        message: "لديك بالفعل رمز تحقق صالح. يرجى استخدام الرمز المرسل مسبقاً ",
+      });
+    }
 
-        // Create transporter
-        const transporter = nodemailer.createTransport({
-            host: 'mail.alephyaa.net',
-            port: 465,
-            secure: true,
-            auth: {
-                user: process.env.EMAIL,
-                pass: process.env.EMAIL_PASSWORD
-            }
-        });
+    // Generate a random 6-digit code
+    const verificationCode = Math.floor(
+      100000 + Math.random() * 900000,
+    ).toString();
 
-        // Create HTML email template
-        const htmlEmail = `
+    // Save the code to database
+    supervisor.verifiedCode = verificationCode;
+    await supervisor.save();
+
+    // Create transporter
+    const transporter = nodemailer.createTransport({
+      host: "smtp.gmail.com",
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.EMAIL,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    });
+
+    // Create HTML email template
+    const htmlEmail = `
         <!DOCTYPE html>
         <html dir="rtl">
         <head>
@@ -518,46 +548,52 @@ export const generateVerificationCode = async (req, res) => {
         </html>
         `;
 
-        // Send email
-        await transporter.sendMail({
-            from: process.env.EMAIL,
-            to: email,
-            subject: "رمز التحقق - أندية القراءة المدرسية",
-            html: htmlEmail
-        });
+    // Send email
+    await transporter.sendMail({
+      from: process.env.EMAIL,
+      to: email,
+      subject: "رمز التحقق - أندية القراءة المدرسية",
+      html: htmlEmail,
+    });
 
-        res.status(200).json({ message: "تم إرسال رمز التحقق بنجاح" });
-    } catch (error) {
-        res.status(500).json({ message: "حدث خطأ أثناء إرسال رمز التحقق", error: error.message });
-    }
+    res.status(200).json({ message: "تم إرسال رمز التحقق بنجاح" });
+  } catch (error) {
+    res.status(500).json({
+      message: "حدث خطأ أثناء إرسال رمز التحقق",
+      error: error.message,
+    });
+  }
 };
 
 export const verifyCodeAndResetPassword = async (req, res) => {
-    try {
-        const { email, verificationCode, newPassword, confirmPassword } = req.body;
+  try {
+    const { email, verificationCode, newPassword, confirmPassword } = req.body;
 
-        // Validate passwords match
-        if (newPassword !== confirmPassword) {
-            return res.status(400).json({ message: "كلمات المرور غير متطابقة" });
-        }
-
-        // Find teacher and verify code
-        const supervisor = await Supervisormodel.findOne({ 
-            email, 
-            verifiedCode: verificationCode 
-        });
-
-        if (!supervisor) {
-            return res.status(400).json({ message: "رمز التحقق غير صحيح" });
-        }
-
-        // Update password and remove verification code
-        supervisor.password = newPassword;
-        supervisor.verifiedCode = undefined;
-        await supervisor.save();
-
-        res.status(200).json({ message: "تم تغيير كلمة المرور بنجاح" });
-    } catch (error) {
-        res.status(500).json({ message: "حدث خطأ أثناء تغيير كلمة المرور", error: error.message });
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: "كلمات المرور غير متطابقة" });
     }
+
+    // Find teacher and verify code
+    const supervisor = await Supervisormodel.findOne({
+      email,
+      verifiedCode: verificationCode,
+    });
+
+    if (!supervisor) {
+      return res.status(400).json({ message: "رمز التحقق غير صحيح" });
+    }
+
+    // Update password and remove verification code
+    supervisor.password = newPassword;
+    supervisor.verifiedCode = undefined;
+    await supervisor.save();
+
+    res.status(200).json({ message: "تم تغيير كلمة المرور بنجاح" });
+  } catch (error) {
+    res.status(500).json({
+      message: "حدث خطأ أثناء تغيير كلمة المرور",
+      error: error.message,
+    });
+  }
 };
